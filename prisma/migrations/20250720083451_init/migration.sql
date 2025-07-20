@@ -2,6 +2,7 @@
 CREATE TABLE "users" (
     "provider_id" TEXT NOT NULL,
     "email" TEXT NOT NULL,
+    "organisation_name" TEXT NOT NULL,
     "phone" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "is_verified" BOOLEAN NOT NULL DEFAULT false,
