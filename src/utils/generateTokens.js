@@ -1,18 +1,20 @@
 import jwt from "jsonwebtoken"
-import { encryptId } from "./crypto.js"
+import { decryptId, encryptId } from "./crypto.js"
 import prisma from "../prismaClient.js"
 
 export const generateTokens = async (userId, role, organisation_name) => {
+
+    await prisma.refreshToken.deleteMany({
+      where: { userId }
+    })
+
     const accessToken = jwt.sign(
       { userId: encryptId(userId), role, organisation_name },
       process.env.ACCESS_TOKEN_SECRET,
       { expiresIn: "15m" }  
     )
 
-    await prisma.refreshToken.deleteMany({
-      where: { userId }
-    })
-
+    
     const refreshToken = jwt.sign(
         { userId:  encryptId(userId) },
         process.env.REFRESH_TOKEN_SECRET,

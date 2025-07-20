@@ -27,6 +27,8 @@ model Provider {
   otpExpiration DateTime   @map("otp_expires")
   isDeleted    Boolean     @default(false)
   role         String      @default("provider")
+  forgotOtp   String       @default("") @map("forgot_password_otp")
+  forgotOtpExpire DateTime @map("forgot_password_expire_time")
   updatedAt    DateTime    @default(now()) @map("updated_at")
   createdAt    DateTime    @default(now()) @map("created_at")
   refreshToken RefreshToken? @relation("UserRefreshToken") // Changed to refreshToken (camelCase)
