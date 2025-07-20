@@ -4,7 +4,8 @@ import cookieParser from "cookie-parser"
 import authRoutes from "./routes/authRoutes.js"
 
 
-//console.log(crypto.randomBytes(64).toString("hex"));
+// console.log(crypto.randomBytes(32).toString("hex"));
+
 
 
 

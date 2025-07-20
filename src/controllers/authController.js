@@ -7,7 +7,7 @@ import bcrypt from "bcryptjs"
 import { generateVerificationToken } from "../utils/generateVerificationToken.js";
 import { generateTokens } from "../utils/generateTokens.js";
 import { setCookies } from "../utils/setCookies.js";
-import { sendVerificationEmail } from "../mailtrap/emails.js";
+import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js";
 import prisma from "../prismaClient.js";
 import getClientIp from "../utils/getClientIp";
 
@@ -31,7 +31,7 @@ const register = async (req, res) => {
         }
 
         console.log(validData);
-        
+
 
         if (!validData.email || !validData.organisation_name || !validData.phone || !validData.password) {
             return res.status(400).json({ message: "All fields are required" });
@@ -124,12 +124,12 @@ const register = async (req, res) => {
 
         });
 
-        
+
 
 
         // I suggest the user be logged in immediately after registration
         //tokens
-        const { accessToken, refreshToken } = generateTokens(user.id)
+        const { accessToken, refreshToken } = generateTokens(user.id, user.role, user.organisation_name)
 
         setCookies(res, accessToken, refreshToken)
 
@@ -142,7 +142,7 @@ const register = async (req, res) => {
             message: "User created successfully",
             user
         })
-        
+
 
     } catch (error) {
         console.log("Error in the register function in the authController: ", error);
@@ -152,24 +152,156 @@ const register = async (req, res) => {
 
 
 const verifyEmail = async (req, res) => {
-   const { code } = req.body
-   try {
+    const { code } = req.body
+    try {
 
-     const user = await prisma.provider.findUnique({
-        where: {
-          otp: code,
-          otpExpiration: otpExpiration < Date.now()
+        const user = await prisma.provider.findFirst({
+            where: {
+                otp: code,
+                otpExpiration: {
+                    gt: new Date()
+                }
+            }
+        })
+
+        if (!user) {
+            return res.status(400).json({ success: false, message: "Invalid or expired verification code" })
         }
-     })
+        const updatedUser = await prisma.provider.update({
+           where: {
+             id: user.id
+           },
+           data: {
+             isVerified : true,
+             otp: "",
+             otpExpiration: new Date(0)
+           }
+        })
 
-   } catch (error) {
-     console.log("Error in verifyEmail function", error);
+        await sendWelcomeEmail(updatedUser.email, updatedUser.name)
+
+        res.status(200).json({
+            success: true,
+            message: "Email verified successfully",
+            updatedUser
+        })
+
+
+
+    } catch (error) {
+        console.log("Error in verifyEmail function", error);
+        res.status(500).json({ message: "Server Error" })
+    }
+
+}
+
+
+const resendEmailVerificationCode = async (req, res) => {
+  const { email } = req.body
+
+  try {
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" })
+    }
+
+    const user = await prisma.provider.findUnique({
+        where: {
+            email
+        }
+    })
+    if (!user) {
+        return res.status(404).json({ success: false, message: "User not found" })
+    }
+
+    if(user.isVerified) {
+       return res.status(400).json({ success: false, message: "Email is already verified" })
+    }
+
+    
+       const updatedUser = await prisma.provider.update({
+         where: {
+            id: user.id
+         },
+         data: {
+            otp: generateVerificationToken(),
+            otpExpiration: new Date(Date.now() + 24 * 60 * 60 * 1000)
+         }
+       })
+
+       await sendVerificationEmail(updatedUser.email, updatedUser.otp)
+
+
+       res.status(200).json({
+         success: true,
+         message: "Verification email resent successfully"
+       })
+    
+
+    
+    
+    
+  } catch (error) {
+     console.log("Error in resendVerification function", error);
      res.status(500).json({ message: "Server Error" })
-   }
+    }
+
+
+}
+
+const login = async (req, res) => {
+  const { email, password } = req.body
+
+
+  try {
+    const user = await prisma.provider.findUnique({
+        where: {
+            email
+        }
+    })
+    if(!user) {
+      return res.status(400).json({ message: "Invalid Credentials" })
+    }
+
+    const isPasswordValid = await bcrypt.compare(password, user.password)
+    if(!isPasswordValid) {
+        return res.status(400).json({ message: "Invalid Credentials" })
+    }
+
+    
+
+    if (user.isDeleted) {
+        return res.status(400).json({ message: "User has been deleted, do you want to restore your membership?" })
+    }
+
+
+
+    const { accessToken, refreshToken } = generateTokens(user.id, user.role, user.organisation_name)
+
+    setCookies(res, accessToken, refreshToken)
+
+    if (!user.isVerified) {
+        return res.status(200).json({ message: "Logged in successfully, check your mail to verify your account" })
+    } else {
+        res.status(200).json({
+        success: true,
+        message: "Login Successful",
+        accessToken
+    })
+    }
+
+    
+
+    
+
+  } catch (error) {
+     console.log("Error in login function", error);
+     res.status(500).json({ message: "Server Error" })
+    }
+
 
 }
 
 
 
 
-export { register }
+export { register, verifyEmail, resendEmailVerificationCode, login }

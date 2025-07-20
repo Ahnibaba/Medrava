@@ -16,7 +16,7 @@ datasource db {
 model Provider {
   id           String      @id @default(uuid()) @map("provider_id")
   email        String      @unique
-  organisation_name        String   
+  organisation_name String   
   phone        String      @unique
   password     String 
   isVerified   Boolean     @default(false) @map("is_verified")
@@ -29,7 +29,18 @@ model Provider {
   role         String      @default("provider")
   updatedAt    DateTime    @default(now()) @map("updated_at")
   createdAt    DateTime    @default(now()) @map("created_at")
+  refreshToken RefreshToken? @relation("UserRefreshToken") // Changed to refreshToken (camelCase)
 
   @@map("users")
 }
 
+model RefreshToken {
+  id        String   @id @default(uuid()) @map("refreshtoken_id")
+  token     String   @unique
+  userId    String   @unique @map("user_id")
+  user      Provider @relation("UserRefreshToken", fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+
+  @@map("refresh_tokens")
+}
